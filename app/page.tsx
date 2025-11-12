@@ -1122,6 +1122,18 @@ export default function KFCScheduleApp() {
     }
   }
 
+  const scrollToCoincidence = (day: string) => {
+    const element = document.getElementById(`coincidence-${day}`)
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" })
+      // Resaltar temporalmente el elemento
+      element.classList.add("ring-4", "ring-blue-500")
+      setTimeout(() => {
+        element.classList.remove("ring-4", "ring-blue-500")
+      }, 2000)
+    }
+  }
+
   const findShiftReplacements = (userSchedule: string, day: string, allEmployees: Employee[]) => {
     if (!userSchedule || userSchedule.toLowerCase().includes("descanso")) {
       return { canCoverMe: [] }
@@ -1224,16 +1236,15 @@ export default function KFCScheduleApp() {
               </div>
             </div>
 
-           
             <div className="space-y-3">
-                <Button
-                  onClick={clearStoredData}
-                  variant="outline"
-                  className="w-full border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Limpiar Todos los Datos
-                </Button>
+              <Button
+                onClick={clearStoredData}
+                variant="outline"
+                className="w-full border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Limpiar Todos los Datos
+              </Button>
             </div>
 
             {loading && (
@@ -1257,9 +1268,7 @@ export default function KFCScheduleApp() {
           <>
             <Card className="shadow-lg border-blue-200">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:p-6">
-                <CardTitle className="text-xl sm:text-2xl text-blue-700 flex items-center gap-2">
-                  📊 Resumen
-                </CardTitle>
+                <CardTitle className="text-xl sm:text-2xl text-blue-700 flex items-center gap-2">📊 Resumen</CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:pt-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1285,7 +1294,7 @@ export default function KFCScheduleApp() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="shadow-lg border-green-200">
               <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 sm:p-6">
                 <CardTitle className="text-xl sm:text-2xl text-green-700 flex items-center gap-2">
@@ -1300,8 +1309,13 @@ export default function KFCScheduleApp() {
                     return (
                       <div
                         key={daySchedule.date}
+                        // Añadir onClick para hacer scroll a la coincidencia si no es descanso
+                        onClick={() => !isRest && scrollToCoincidence(daySchedule.dayName)}
                         className={`flex justify-between items-center p-3 sm:p-4 rounded-xl transition-all ${
-                          isRest ? "bg-gray-100 border-2 border-gray-200" : "bg-blue-50 border-2 border-blue-200"
+                          isRest
+                            ? "bg-gray-100 border-2 border-gray-200"
+                            : // Añadir estilos para hacer el div clicable y visible
+                              "bg-blue-50 border-2 border-blue-200 cursor-pointer hover:bg-blue-100 hover:border-blue-300 hover:shadow-md"
                         }`}
                       >
                         <div className="flex flex-col">
@@ -1331,7 +1345,7 @@ export default function KFCScheduleApp() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="shadow-lg border-indigo-200">
               <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 p-4 sm:p-6">
                 <CardTitle className="text-xl sm:text-2xl text-indigo-700 flex items-center gap-2">
@@ -1390,7 +1404,7 @@ export default function KFCScheduleApp() {
                           <div key={day} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                             <div className="font-medium text-gray-700 mb-3">
                               📅{DAY_NAMES[day as keyof typeof DAY_NAMES]}
-                            </div>  
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div>
                                 <Label htmlFor={`${day}-in`} className="text-sm text-gray-600">
@@ -1435,7 +1449,6 @@ export default function KFCScheduleApp() {
                   </TabsContent>
                 </Tabs>
 
-
                 {weeklyHourTracker.totalPlanned > 0 && weeklyHourTracker.totalActual > 0 && (
                   <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200 text-center">
                     <div className="text-lg font-bold text-yellow-700">
@@ -1458,14 +1471,12 @@ export default function KFCScheduleApp() {
                     variant="outline"
                     className="w-full border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
                   >
-                    <RefreshCw className="h-4 w-4 mr-2" />Nueva Quincena
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Nueva Quincena
                   </Button>
                 </div>
               </CardContent>
             </Card>
-
-           
-           
 
             <Card className="shadow-lg border-blue-200">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:p-6">
@@ -1486,7 +1497,12 @@ export default function KFCScheduleApp() {
 
                     if (userSchedule.toLowerCase().includes("descanso")) {
                       return (
-                        <div key={day} className="p-3 sm:p-4 rounded-xl bg-gray-100 border-2 border-gray-200">
+                        <div
+                          key={day}
+                          // Añadir ID para hacer scroll
+                          id={`coincidence-${day}`}
+                          className="p-3 sm:p-4 rounded-xl bg-gray-100 border-2 border-gray-200 transition-all"
+                        >
                           <div className="font-bold text-base sm:text-lg text-gray-600 flex items-center gap-2">
                             😴 {DAY_NAMES[day as keyof typeof DAY_NAMES]} - Descanso
                           </div>
@@ -1495,7 +1511,12 @@ export default function KFCScheduleApp() {
                     }
 
                     return (
-                      <div key={day} className="p-3 sm:p-4 rounded-xl border-2 bg-white border-blue-200">
+                      <div
+                        key={day}
+                        // Añadir ID para hacer scroll
+                        id={`coincidence-${day}`}
+                        className="p-3 sm:p-4 rounded-xl border-2 bg-white border-blue-200 transition-all"
+                      >
                         <div className="font-bold text-base sm:text-lg mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
                           <span className="flex items-center gap-2">📅 {DAY_NAMES[day as keyof typeof DAY_NAMES]}</span>
                           <Badge variant="outline" className="text-xs sm:text-sm w-fit">
