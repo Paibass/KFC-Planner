@@ -394,8 +394,8 @@ const calculateDayHours = (schedule: string): { hours: number; nightHours: numbe
   const totalMinutes = endMinutes - startMinutes
   const hours = totalMinutes / 60
 
-  // Calcular horas nocturnas (22:00 - 06:00)
-  const nightStart = 22 * 60
+  // Calcular horas nocturnas (21:00 - 06:00)
+  const nightStart = 21 * 60
   const nightEnd = 6 * 60
   let nightMinutes = 0
 
@@ -1289,7 +1289,7 @@ export default function KFCScheduleApp() {
                       {currentWeekData.userStats?.nightHours || 0}h
                     </div>
                     <div className="text-sm font-semibold text-purple-600">🌙 Horas Nocturnas</div>
-                    <div className="text-xs text-purple-500">(22:00 - 06:00)</div>
+                    <div className="text-xs text-purple-500">(21:00 - 06:00)</div>
                   </div>
                 </div>
               </CardContent>
