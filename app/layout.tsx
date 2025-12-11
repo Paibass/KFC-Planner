@@ -22,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className={`${inter.variable} ${robotoMono.variable}`}>
+    <html lang="es">
       <body className={`font-sans ${_v0_fontVariables}`}>{children}</body>
     </html>
   )
