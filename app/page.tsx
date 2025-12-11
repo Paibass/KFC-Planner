@@ -204,166 +204,477 @@ const generateWeekDates = (startDate: Date): DailySchedule[] => {
   return dates
 }
 
+// Función para parsear PDF con lógica mejorada de extracción
+const parsePDF = async (file: File): Promise<string> => {
+  if (!pdfjsLib) {
+    throw new Error("PDF.js no está cargado")
+  }
+
+  const arrayBuffer = await file.arrayBuffer()
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer })
+  const pdf = await loadingTask.promise
+
+  let fullText = ""
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum)
+    const textContent = await page.getTextContent()
+    const pageText = textContent.items.map((item: any) => item.str || "").join(" ")
+    fullText += pageText + " "
+  }
+
+  // Limpiar el texto extraído para facilitar el parsing
+  return cleanPDFText(fullText.trim())
+}
+
+const cleanPDFText = (text: string): string => {
+  // No eliminar pie de página ya que algunos empleados aparecen después
+  return text
+    .replace(/Departamento:.*?Domingo/gi, "") // Solo remover encabezados
+    .replace(/Apellido y Nombre.*?Domingo/gi, "")
+    .replace(/CUIL\s+Lunes.*?Domingo/gi, "")
+    .replace(/Página \d+/gi, "")
+    .replace(/https?:\/\/[^\s]+/gi, "") // Remover URLs
+    .replace(/\f/g, " ")
+    .replace(/[ƟƟ]/g, "t") // Normalizar caracteres especiales
+    .replace(/\r\n/g, " ")
+    .replace(/\n/g, " ")
+    .replace(/\r/g, " ")
+    .replace(/\s{2,}/g, " ") // Normalizar espacios
+    .trim()
+}
+
+const detectWeekInfo = (text: string): { startDate: Date; endDate: Date; period: string } => {
+  const datePatterns = [
+    /semana del (\d{1,2}\/\d{1,2}\/\d{2,4})\s*al?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+    /(\d{1,2}\/\d{1,2}\/\d{2,4})\s*-\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+    /del (\d{1,2}\/\d{1,2}\/\d{2,4})\s*al?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+  ]
+
+  let startDate = new Date()
+  let endDate = new Date()
+  let period = "Semana sin fecha"
+
+  for (const pattern of datePatterns) {
+    const match = text.match(pattern)
+    if (match) {
+      const startStr = match[1]
+      const endStr = match[2]
+
+      const parseDate = (dateStr: string): Date => {
+        const parts = dateStr.split("/")
+        if (parts.length === 3) {
+          let year = Number.parseInt(parts[2])
+          if (year < 100) year += 2000
+          return new Date(year, Number.parseInt(parts[1]) - 1, Number.parseInt(parts[0]))
+        }
+        return new Date()
+      }
+
+      startDate = parseDate(startStr)
+      endDate = parseDate(endStr)
+      period = `${startStr} - ${endStr}`
+      break
+    }
+  }
+
+  return { startDate, endDate, period }
+}
+
+const retryFailedCuilExtraction = (
+  cleanedText: string,
+  cuil: string,
+  cuilIndex: number,
+  nextCuilIndex: number,
+  prevCuilIndex: number,
+  weekDates: any[],
+  usedNames: Set<string>, // Agregar conjunto de nombres ya utilizados
+): Employee | null => {
+  console.log(`🔄 REINTENTANDO extracción para CUIL: ${cuil}`)
+
+  const expandedNameStart = Math.max(0, prevCuilIndex - 200)
+  const expandedNameEnd = cuilIndex
+  const expandedNameSegment = cleanedText.substring(expandedNameStart, expandedNameEnd)
+
+  let name = ""
+
+  // Método Alt 1: Buscar patrón con coma más cercano al CUIL
+  const allNamesWithComma = [
+    ...expandedNameSegment.matchAll(
+      /([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+)*\s*,\s*[A-ZÁÉÍÓÚÑa-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]+)*)/gi,
+    ),
+  ]
+
+  if (allNamesWithComma.length > 0) {
+    for (let i = allNamesWithComma.length - 1; i >= 0; i--) {
+      const candidateName = allNamesWithComma[i][1].trim()
+      if (!usedNames.has(candidateName)) {
+        name = candidateName
+        console.log(`   Método Alt 1: Nombre con coma encontrado: "${name}"`)
+        break
+      } else {
+        console.log(`   ⚠️ Nombre "${candidateName}" ya está asignado a otro CUIL, buscando siguiente...`)
+      }
+    }
+  }
+
+  // Método Alt 2: Buscar desde la última coma hacia atrás
+  if (!name || name.length < 3) {
+    const lastCommaIndex = expandedNameSegment.lastIndexOf(",")
+    if (lastCommaIndex > 0) {
+      const beforeLastComma = expandedNameSegment.lastIndexOf(",", lastCommaIndex - 1)
+      const startIndex = beforeLastComma > 0 ? beforeLastComma + 1 : Math.max(0, lastCommaIndex - 50)
+      const candidateName = expandedNameSegment.substring(startIndex, lastCommaIndex + 50).trim()
+
+      const nameExtract = candidateName.match(
+        /([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+)*\s*,\s*[A-ZÁÉÍÓÚÑa-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]+)*)/i,
+      )
+      if (nameExtract) {
+        const extractedName = nameExtract[1].trim()
+        if (!usedNames.has(extractedName)) {
+          name = extractedName
+          console.log(`   Método Alt 2: Nombre por búsqueda de coma: "${name}"`)
+        } else {
+          console.log(`   ⚠️ Nombre "${extractedName}" ya está asignado, saltando método 2`)
+        }
+      }
+    }
+  }
+
+  // Método Alt 3: Buscar cualquier texto con mayúsculas y coma antes del CUIL
+  if (!name || name.length < 3) {
+    const simplePattern = expandedNameSegment.match(
+      /([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+,\s*[A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)(?=\s*\d{2}[\s-]*\d)/i,
+    )
+    if (simplePattern) {
+      const extractedName = simplePattern[1].trim()
+      if (!usedNames.has(extractedName)) {
+        name = extractedName
+        console.log(`   Método Alt 3: Nombre con patrón simple: "${name}"`)
+      } else {
+        console.log(`   ⚠️ Nombre "${extractedName}" ya está asignado, saltando método 3`)
+      }
+    }
+  }
+
+  // Método Alt 4: Buscar línea completa antes del CUIL que contenga coma
+  if (!name || name.length < 3) {
+    const lines = expandedNameSegment.split(/\n/)
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim()
+      if (
+        line.includes(",") &&
+        line.length >= 5 &&
+        line.length <= 80 &&
+        /[A-ZÁÉÍÓÚÑ]/i.test(line) &&
+        !/\d{2}:\d{2}/.test(line) &&
+        !line.toLowerCase().includes("descanso")
+      ) {
+        if (!usedNames.has(line)) {
+          name = line
+          console.log(`   Método Alt 4: Nombre por línea con coma: "${name}"`)
+          break
+        } else {
+          console.log(`   ⚠️ Nombre "${line}" ya está asignado, continuando búsqueda...`)
+        }
+      }
+    }
+  }
+
+  if (!name || name.length < 3) {
+    console.log(`   ❌ No se pudo extraer nombre con métodos alternativos`)
+    return null
+  }
+
+  // Limpiar nombre
+  name = name
+    .replace(/\d{1,2}:\d{2}\s*[-–—~]\s*\d{1,2}:\d{2}/g, "")
+    .replace(/\bDescanso\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  console.log(`   ✅ Nombre extraído: "${name}"`)
+
+  // Buscar horarios con métodos alternativos
+  const expandedScheduleStart = cuilIndex
+  const expandedScheduleEnd = nextCuilIndex
+  const expandedScheduleSegment = cleanedText.substring(expandedScheduleStart, expandedScheduleEnd)
+
+  const scheduleMatches: string[] = []
+
+  // Método Alt 1: Patrón estándar más flexible
+  const pattern1 = /(\d{1,2}:\d{2}\s*[-–—~]\s*\d{1,2}:\d{2}|Descanso)/gi
+  let match
+  pattern1.lastIndex = 0
+  while ((match = pattern1.exec(expandedScheduleSegment)) !== null && scheduleMatches.length < 7) {
+    scheduleMatches.push(match[1].trim().replace(/[-–—~]/g, "-"))
+    if (pattern1.lastIndex === match.index) pattern1.lastIndex++
+  }
+
+  // Método Alt 2: Buscar horarios en líneas separadas
+  if (scheduleMatches.length < 7) {
+    console.log(`   🔄 Método Alt: Buscando horarios en líneas separadas`)
+    const lines = expandedScheduleSegment.split(/\n/)
+    const lineSchedules: string[] = []
+
+    for (const line of lines) {
+      if (lineSchedules.length >= 7) break
+      const lineMatch = line.match(/(\d{1,2}:\d{2}\s*[-–—~]\s*\d{1,2}:\d{2})/i)
+      if (lineMatch) {
+        lineSchedules.push(lineMatch[1].trim().replace(/[-–—~]/g, "-"))
+      } else if (/descanso/i.test(line) && !line.match(/\d{2}:\d{2}/)) {
+        lineSchedules.push("Descanso")
+      }
+    }
+
+    if (lineSchedules.length === 7) {
+      scheduleMatches.length = 0
+      scheduleMatches.push(...lineSchedules)
+      console.log(`   ✅ Horarios encontrados por líneas: ${scheduleMatches.length}`)
+    }
+  }
+
+  // Método Alt 3: Buscar día por día con palabras clave
+  if (scheduleMatches.length < 7) {
+    console.log(`   🔄 Método Alt: Buscando horarios día por día`)
+    const dayKeywords = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    const daySchedules: string[] = []
+
+    for (const dayName of dayKeywords) {
+      const dayRegex = new RegExp(`${dayName}[^\\d]*(\\d{1,2}:\\d{2}\\s*[-–—~]\\s*\\d{1,2}:\\d{2}|Descanso)`, "i")
+      const dayMatch = expandedScheduleSegment.match(dayRegex)
+      if (dayMatch) {
+        daySchedules.push(dayMatch[1].trim().replace(/[-–—~]/g, "-"))
+      }
+    }
+
+    if (daySchedules.length === 7) {
+      scheduleMatches.length = 0
+      scheduleMatches.push(...daySchedules)
+      console.log(`   ✅ Horarios encontrados por día: ${scheduleMatches.length}`)
+    }
+  }
+
+  console.log(`   Horarios finales: ${scheduleMatches.length}/7`)
+
+  if (scheduleMatches.length === 7) {
+    const weeklySchedule = {
+      lunes: scheduleMatches[0],
+      martes: scheduleMatches[1],
+      miercoles: scheduleMatches[2],
+      jueves: scheduleMatches[3],
+      viernes: scheduleMatches[4],
+      sabado: scheduleMatches[5],
+      domingo: scheduleMatches[6],
+    }
+
+    const dailySchedules = weekDates.map((dateInfo: any, index: number) => {
+      const schedule = scheduleMatches[index]
+      const { hours, nightHours } = calculateDayHours(schedule)
+      return { ...dateInfo, schedule, hours, nightHours }
+    })
+
+    console.log(`   ✅ Reintento exitoso para ${name}`)
+    return { name, cuil, weeklySchedule, dailySchedules }
+  }
+
+  console.log(`   ❌ Reintento fallido: solo ${scheduleMatches.length}/7 horarios`)
+  return null
+}
+
 // Función mejorada para parsear empleados con fechas reales
 const parseEmployeesFromText = (text: string, weekStartDate: Date): Employee[] => {
   const employees: Employee[] = []
+  const usedNames = new Set<string>()
   const weekDates = generateWeekDates(weekStartDate)
 
-  // Limpiar el texto
-  const cleanedText = text.replace(/[ƟƟ]/g, "t").replace(/\s+/g, " ").trim()
+  const cleanedText = cleanPDFText(text)
 
-  console.log("=== PARSING CON FECHAS REALES ===")
+  console.log("=== PARSING OPTIMIZADO PARA 22 EMPLEADOS ===")
   console.log(
     "Fechas de la semana:",
     weekDates.map((d) => `${d.dayName}: ${d.date}`),
   )
 
-  // Buscar CUILs
-  const cuilMatches = [...cleanedText.matchAll(/(\d{2}-\d{8}-\d)/g)]
-  console.log(`Encontrados ${cuilMatches.length} CUILs`)
+  // Buscar todos los CUILs con patrón flexible
+  const cuilPattern = /(\d{2})[\s-]*(\d{7,9})[\s-]*(\d)/g
+  const cuilMatches = [...cleanedText.matchAll(cuilPattern)]
 
+  console.log(`\nCUILs detectados: ${cuilMatches.length}`)
+  cuilMatches.forEach((match, idx) => {
+    const cuil = `${match[1]}-${match[2]}-${match[3]}`
+    console.log(`  ${idx + 1}. ${cuil} en posición ${match.index}`)
+  })
+
+  const failedCuils: Array<{ cuil: string; rawText: string }> = []
+
+  // Procesar cada CUIL
   for (let i = 0; i < cuilMatches.length; i++) {
     const match = cuilMatches[i]
-    const cuil = match[1]
+    const cuil = `${match[1]}-${match[2]}-${match[3]}`
     const cuilIndex = match.index!
+    const cuilEndIndex = cuilIndex + match[0].length
 
-    console.log(`\n=== Procesando CUIL: ${cuil} ===`)
+    console.log(`\n--- CUIL ${i + 1}/${cuilMatches.length}: ${cuil} ---`)
 
-    // Buscar nombre (lógica anterior mantenida)
-    const prevCuilIndex = i > 0 ? cuilMatches[i - 1].index! + cuilMatches[i - 1][0].length : 0
-    const nextCuilIndex = i < cuilMatches.length - 1 ? cuilMatches[i + 1].index! : cleanedText.length
-
-    const nameSearchStart = Math.max(0, prevCuilIndex)
+    // Definir segmento de búsqueda para el nombre (antes del CUIL)
+    const nameSearchStart = i > 0 ? cuilMatches[i - 1].index! + cuilMatches[i - 1][0].length : 0
     const nameSearchEnd = cuilIndex
     const nameSegment = cleanedText.substring(nameSearchStart, nameSearchEnd).trim()
 
-    const namePatterns = [
-      /([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+)*\s*,\s*[A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+)*)\s*$/i,
-      /([A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+){1,4})\s*$/i,
-      /([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s,.-]*[A-ZÁÉÍÓÚÑ])\s*$/i,
-    ]
-
+    // Extraer nombre con patrón robusto
     let name = ""
-    for (const pattern of namePatterns) {
-      const nameMatch = nameSegment.match(pattern)
-      if (nameMatch) {
-        name = nameMatch[1].trim()
-        break
+
+    // Patrón 1: Buscar "APELLIDO , Nombre" o "APELLIDO, Nombre" (con espacios opcionales alrededor de la coma)
+    const namePattern1 =
+      /([A-ZÁÉÍÓÚÑ']+(?:\s+[A-ZÁÉÍÓÚÑ']+)*)\s*,\s*([A-ZÁÉÍÓÚÑa-záéíóúñ']+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ']+)*)\s*$/i
+    const nameMatch1 = nameSegment.match(namePattern1)
+
+    if (nameMatch1) {
+      name = `${nameMatch1[1].trim()} , ${nameMatch1[2].trim()}` // Preservar formato con espacio antes de coma
+    } else {
+      // Patrón 2: Últimas 2-4 palabras antes del CUIL
+      const words = nameSegment.split(/\s+/).filter((w) => w.length > 1 && /^[A-ZÁÉÍÓÚÑa-záéíóúñ']+$/.test(w))
+      if (words.length >= 2) {
+        const lastName = words[words.length - 2]
+        const firstName = words[words.length - 1]
+        name = `${lastName}, ${firstName}`
       }
     }
 
-    if (!name) {
-      const words = nameSegment.split(/\s+/).filter((word) => word.length > 0)
-      const lastWords = words.slice(-6)
-      for (let j = lastWords.length - 1; j >= 0; j--) {
-        const candidateName = lastWords.slice(j).join(" ")
-        if (candidateName.length >= 5 && /^[A-ZÁÉÍÓÚÑ\s,.-]+$/i.test(candidateName)) {
-          name = candidateName
+    // Limpiar nombre de restos
+    name = name
+      .replace(/\d{1,2}:\d{2}/g, "")
+      .replace(/Descanso/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+
+    if (!name || name.length < 3 || usedNames.has(name)) {
+      console.log(`❌ Nombre inválido o duplicado para ${cuil}: "${name}"`)
+      const nextIndex = i < cuilMatches.length - 1 ? cuilMatches[i + 1].index! : cleanedText.length
+      failedCuils.push({
+        cuil,
+        rawText: cleanedText.substring(nameSearchStart, nextIndex),
+      })
+      continue
+    }
+
+    console.log(`✓ Nombre: "${name}"`)
+
+    // Buscar horarios (después del CUIL hasta el siguiente CUIL)
+    const scheduleSearchStart = cuilEndIndex
+    const scheduleSearchEnd = i < cuilMatches.length - 1 ? cuilMatches[i + 1].index! : cleanedText.length
+    const scheduleSegment = cleanedText.substring(scheduleSearchStart, scheduleSearchEnd)
+
+    // Extraer exactamente 7 horarios en orden
+    const schedulePattern = /(\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2}|Descanso)/gi
+    const scheduleMatches: string[] = []
+    let scheduleMatch
+
+    while ((scheduleMatch = schedulePattern.exec(scheduleSegment)) !== null && scheduleMatches.length < 7) {
+      const schedule = scheduleMatch[1].trim().replace(/[-–—]/g, "-")
+      scheduleMatches.push(schedule)
+    }
+
+    console.log(`  Horarios: ${scheduleMatches.length}/7`)
+
+    if (scheduleMatches.length !== 7) {
+      console.log(`⚠️ Solo ${scheduleMatches.length} horarios, marcando para reintento`)
+      failedCuils.push({
+        cuil,
+        rawText: cleanedText.substring(nameSearchStart, scheduleSearchEnd),
+      })
+      continue
+    }
+
+    // Crear estructura de horarios
+    const weeklySchedule = {
+      lunes: scheduleMatches[0],
+      martes: scheduleMatches[1],
+      miercoles: scheduleMatches[2],
+      jueves: scheduleMatches[3],
+      viernes: scheduleMatches[4],
+      sabado: scheduleMatches[5],
+      domingo: scheduleMatches[6],
+    }
+
+    const dailySchedules = weekDates.map((dateInfo, index) => {
+      const schedule = scheduleMatches[index]
+      const { hours, nightHours } = calculateDayHours(schedule)
+      return { ...dateInfo, schedule, hours, nightHours }
+    })
+
+    employees.push({ name, cuil, weeklySchedule, dailySchedules })
+    usedNames.add(name)
+    console.log(`✅ ${employees.length}. ${name} - ${cuil}`)
+  }
+
+  if (failedCuils.length > 0) {
+    console.log(`\n=== REINTENTOS PARA ${failedCuils.length} CUILS FALLIDOS ===`)
+
+    for (const failed of failedCuils) {
+      console.log(`\nReintentando CUIL: ${failed.cuil}`)
+
+      // Método alternativo: buscar por línea completa
+      const lines = failed.rawText.split(/\s{2,}/)
+
+      for (const line of lines) {
+        if (!line.includes(failed.cuil)) continue
+
+        // Extraer nombre
+        const beforeCuil = line.substring(0, line.indexOf(failed.cuil.replace(/-/g, ""))).trim()
+        const nameMatch = beforeCuil.match(
+          /([A-ZÁÉÍÓÚÑ']+(?:\s+[A-ZÁÉÍÓÚÑ']+)*)\s*,\s*([A-ZÁÉÍÓÚÑa-záéíóúñ']+(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ']+)*)$/i,
+        )
+
+        if (!nameMatch) continue
+
+        const name = `${nameMatch[1].trim()} , ${nameMatch[2].trim()}`
+
+        if (usedNames.has(name)) {
+          console.log(`  Nombre duplicado: "${name}", omitiendo`)
+          continue
+        }
+
+        // Extraer horarios
+        const afterCuil = line.substring(
+          line.indexOf(failed.cuil.replace(/-/g, "")) + failed.cuil.replace(/-/g, "").length,
+        )
+        const scheduleMatches = [...afterCuil.matchAll(/(\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2}|Descanso)/gi)]
+
+        if (scheduleMatches.length === 7) {
+          const schedules = scheduleMatches.map((m) => m[1].trim().replace(/[-–—]/g, "-"))
+
+          const weeklySchedule = {
+            lunes: schedules[0],
+            martes: schedules[1],
+            miercoles: schedules[2],
+            jueves: schedules[3],
+            viernes: schedules[4],
+            sabado: schedules[5],
+            domingo: schedules[6],
+          }
+
+          const dailySchedules = weekDates.map((dateInfo, index) => {
+            const schedule = schedules[index]
+            const { hours, nightHours } = calculateDayHours(schedule)
+            return { ...dateInfo, schedule, hours, nightHours }
+          })
+
+          employees.push({ name, cuil: failed.cuil, weeklySchedule, dailySchedules })
+          usedNames.add(name)
+          console.log(`✅ RECUPERADO: ${employees.length}. ${name} - ${failed.cuil}`)
           break
         }
       }
     }
-
-    if (!name || name.length < 3) {
-      console.log(`❌ No se pudo extraer nombre válido para CUIL: ${cuil}`)
-      continue
-    }
-
-    name = name
-      .replace(/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/g, "")
-      .replace(/\bDescanso\b/gi, "")
-      .replace(/[^\w\s,.-]/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-
-    console.log(`✅ Nombre válido: "${name}"`)
-
-    // Buscar horarios
-    const scheduleSearchStart = cuilIndex + cuil.length
-    const scheduleSearchEnd = Math.min(nextCuilIndex, scheduleSearchStart + 1000)
-    const scheduleSegment = cleanedText.substring(scheduleSearchStart, scheduleSearchEnd).trim()
-
-    const schedulePattern = /(\d{2}:\d{2}\s*-\s*\d{2}:\d{2}|Descanso)(?=\s|$|[A-ZÁÉÍÓÚÑ]|\d{2}-|Página|\n|\r)/gi
-    const scheduleMatches = []
-
-    schedulePattern.lastIndex = 0
-    let scheduleMatch
-    let attempts = 0
-
-    while (
-      (scheduleMatch = schedulePattern.exec(scheduleSegment)) !== null &&
-      scheduleMatches.length < 7 &&
-      attempts < 20
-    ) {
-      const schedule = scheduleMatch[1].trim()
-      scheduleMatches.push(schedule)
-      attempts++
-
-      if (schedulePattern.lastIndex === scheduleMatch.index) {
-        schedulePattern.lastIndex++
-      }
-    }
-
-    if (scheduleMatches.length < 7) {
-      const flexiblePattern = /(\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2}|Descanso)/gi
-      const flexibleMatches = []
-      flexiblePattern.lastIndex = 0
-      let flexMatch
-      while ((flexMatch = flexiblePattern.exec(scheduleSegment)) !== null && flexibleMatches.length < 7) {
-        flexibleMatches.push(flexMatch[1].trim())
-      }
-
-      if (flexibleMatches.length > scheduleMatches.length) {
-        scheduleMatches.length = 0
-        scheduleMatches.push(...flexibleMatches.slice(0, 7))
-      }
-    }
-
-    if (scheduleMatches.length === 7) {
-      // Crear horarios semanales tradicionales
-      const weeklySchedule = {
-        lunes: scheduleMatches[0],
-        martes: scheduleMatches[1],
-        miercoles: scheduleMatches[2],
-        jueves: scheduleMatches[3],
-        viernes: scheduleMatches[4],
-        sabado: scheduleMatches[5],
-        domingo: scheduleMatches[6],
-      }
-
-      // Crear horarios diarios con fechas reales
-      const dailySchedules = weekDates.map((dateInfo, index) => {
-        const schedule = scheduleMatches[index]
-        const { hours, nightHours } = calculateDayHours(schedule)
-
-        return {
-          ...dateInfo,
-          schedule,
-          hours,
-          nightHours,
-        }
-      })
-
-      const employee: Employee = {
-        name,
-        cuil,
-        weeklySchedule,
-        dailySchedules,
-      }
-
-      employees.push(employee)
-      console.log(`✅ Empleado agregado: ${name} (${cuil})`)
-      console.log(`   Horarios por fecha:`)
-      dailySchedules.forEach((day) => {
-        console.log(`   ${day.date} (${day.dayName}): ${day.schedule} - ${day.hours}h (${day.nightHours}h nocturnas)`)
-      })
-    } else {
-      console.log(`❌ Horarios incompletos para ${name}: ${scheduleMatches.length}/7`)
-    }
   }
 
-  console.log(`\n=== RESUMEN FINAL ===`)
-  console.log(`Total empleados procesados: ${employees.length}/${cuilMatches.length}`)
+  console.log(`\n=== RESULTADO FINAL: ${employees.length} EMPLEADOS PROCESADOS ===`)
+
+  if (employees.length < 22) {
+    console.warn(`⚠️ ADVERTENCIA: Solo se procesaron ${employees.length}/22 empleados esperados`)
+  }
 
   return employees
 }
@@ -394,8 +705,8 @@ const calculateDayHours = (schedule: string): { hours: number; nightHours: numbe
   const totalMinutes = endMinutes - startMinutes
   const hours = totalMinutes / 60
 
-  // Calcular horas nocturnas (21:00 - 06:00)
-  const nightStart = 21 * 60
+  // Calcular horas nocturnas (22:00 - 06:00)
+  const nightStart = 22 * 60
   const nightEnd = 6 * 60
   let nightMinutes = 0
 
@@ -844,60 +1155,6 @@ export default function KFCScheduleApp() {
     return fullText.trim()
   }
 
-  const cleanPDFText = (text: string): string => {
-    return text
-      .replace(/PLANILLA DE HORARIOS.*?(?=\w+,|\d{2}-)/gi, "")
-      .replace(/Departamento:.*?(?=\w+,|\d{2}-)/gi, "")
-      .replace(/Semana del.*?(?=\w+,|\d{2}-)/gi, "")
-      .replace(/Apellido y Nombre.*?Domingo/gi, "")
-      .replace(/CUIL.*?Domingo/gi, "")
-      .replace(/Página \d+/gi, "")
-      .replace(/\f/g, " ")
-      .replace(/\r\n/g, " ")
-      .replace(/\n/g, " ")
-      .replace(/\r/g, " ")
-      .replace(/\s{3,}/g, " ")
-      .replace(/\s{2}/g, " ")
-      .trim()
-  }
-
-  const detectWeekInfo = (text: string): { startDate: Date; endDate: Date; period: string } => {
-    const datePatterns = [
-      /semana del (\d{1,2}\/\d{1,2}\/\d{2,4})\s*al?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
-      /(\d{1,2}\/\d{1,2}\/\d{2,4})\s*-\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
-      /del (\d{1,2}\/\d{1,2}\/\d{2,4})\s*al?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
-    ]
-
-    let startDate = new Date()
-    let endDate = new Date()
-    let period = "Semana sin fecha"
-
-    for (const pattern of datePatterns) {
-      const match = text.match(pattern)
-      if (match) {
-        const startStr = match[1]
-        const endStr = match[2]
-
-        const parseDate = (dateStr: string): Date => {
-          const parts = dateStr.split("/")
-          if (parts.length === 3) {
-            let year = Number.parseInt(parts[2])
-            if (year < 100) year += 2000
-            return new Date(year, Number.parseInt(parts[1]) - 1, Number.parseInt(parts[0]))
-          }
-          return new Date()
-        }
-
-        startDate = parseDate(startStr)
-        endDate = parseDate(endStr)
-        period = `${startStr} - ${endStr}`
-        break
-      }
-    }
-
-    return { startDate, endDate, period }
-  }
-
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || file.type !== "application/pdf") {
@@ -915,14 +1172,13 @@ export default function KFCScheduleApp() {
 
     try {
       console.log("🔄 Procesando PDF con nueva lógica de fechas...")
-      const rawText = await readPDF(file)
-      const cleanText = cleanPDFText(rawText)
-      const weekInfo = detectWeekInfo(cleanText)
+      const rawText = await parsePDF(file) // Usar parsePDF que ya incluye clean y detectWeekInfo
+      const weekInfo = detectWeekInfo(rawText) // Re-detectar semana info por si acaso el parsePDF no lo hiciera internamente
 
       console.log(`📅 Semana detectada: ${weekInfo.period}`)
       console.log(`📅 Fecha inicio: ${weekInfo.startDate.toLocaleDateString("es-AR")}`)
 
-      const parsedEmployees = parseEmployeesFromText(cleanText, weekInfo.startDate)
+      const parsedEmployees = parseEmployeesFromText(rawText, weekInfo.startDate)
 
       if (parsedEmployees.length === 0) {
         setError("No se pudieron extraer empleados del PDF. Verifica que el formato sea correcto.")
@@ -1289,7 +1545,7 @@ export default function KFCScheduleApp() {
                       {currentWeekData.userStats?.nightHours || 0}h
                     </div>
                     <div className="text-sm font-semibold text-purple-600">🌙 Horas Nocturnas</div>
-                    <div className="text-xs text-purple-500">(21:00 - 06:00)</div>
+                    <div className="text-xs text-purple-500">(22:00 - 06:00)</div>
                   </div>
                 </div>
               </CardContent>
@@ -1357,8 +1613,12 @@ export default function KFCScheduleApp() {
               <CardContent className="p-4 sm:pt-6">
                 <Tabs value={hourTrackerTab} onValueChange={(v) => setHourTrackerTab(v as "planned" | "actual")}>
                   <TabsList className="grid w-full grid-cols-2 mb-6">
-                    <TabsTrigger value="planned">📋 Horas Previstas</TabsTrigger>
-                    <TabsTrigger value="actual">✅ Horas Reales</TabsTrigger>
+                    <TabsTrigger value="planned" className="text-xs sm:text-sm">
+                      📋 Horas Previstas
+                    </TabsTrigger>
+                    <TabsTrigger value="actual" className="text-xs sm:text-sm">
+                      ✅ Horas Reales
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="planned" className="space-y-4">
