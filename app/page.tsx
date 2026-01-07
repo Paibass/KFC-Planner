@@ -132,6 +132,108 @@ interface WeeklyHourTracker {
   totalActual: number // Acumulado quincenal de horas reales
 }
 
+const BOSSES_SCHEDULE = {
+  "CAMILA TOLABA": {
+    1: "off",
+    2: "10 - 19",
+    3: "13 - 22",
+    4: "14 - 23",
+    5: "8 - 17",
+    6: "15 - 00",
+    7: "off",
+    8: "off",
+    9: "7 - 16",
+    10: "16 - 01",
+    11: "16 - 01",
+    12: "off",
+    13: "10 - 19",
+    14: "7 - 16",
+    15: "8 - 17",
+    16: "off",
+    17: "8 - 17",
+    18: "8 - 17",
+    19: "7 - 16",
+    20: "off",
+    21: "7 - 16",
+    22: "off",
+    23: "8 - 17",
+    24: "off",
+    25: "off",
+    26: "7 - 16",
+    27: "8 - 17",
+    28: "8 - 17",
+    29: "off",
+    30: "8 -17",
+    31: "19 - 04",
+  },
+  "CESAR CRUZ": {
+    1: "off",
+    2: "15 - 00",
+    3: "16 - 01",
+    4: "16 - 01",
+    5: "off",
+    6: "8 - 17",
+    7: "15 - 00",
+    8: "15 - 00",
+    9: "off",
+    10: "8 - 17",
+    11: "8 - 17",
+    12: "15 - 00",
+    13: "15 - 00",
+    14: "off",
+    15: "15 - 00",
+    16: "15 - 00",
+    17: "off",
+    18: "off",
+    19: "15 - 00",
+    20: "15 - 00",
+    21: "off",
+    22: "8 -17",
+    23: "15 - 00",
+    24: "16 - 01",
+    25: "16 - 01",
+    26: "off",
+    27: "15-00",
+    28: "off",
+    29: "8-17",
+    30: "15-00",
+    31: "17 - 02",
+  },
+  "CANDELA FRACASSO": {
+    1: "off",
+    2: "11 - 20",
+    3: "8 - 17",
+    4: "9 - 18",
+    5: "15 - 00",
+    6: "off",
+    7: "7 - 16",
+    8: "8 - 17",
+    9: "15 - 00",
+    10: "off",
+    11: "off",
+    12: "7 - 16",
+    13: "8 - 17",
+    14: "15 - 00",
+    15: "off",
+    16: "7 - 16",
+    17: "16 - 01",
+    18: "16 - 01",
+    19: "off",
+    20: "8 - 17",
+    21: "15 - 00",
+    22: "15 - 00",
+    23: "off",
+    24: "8 - 17",
+    25: "9 - 18",
+    26: "15 - 0",
+    27: "off",
+    28: "15 - 00",
+    29: "15 - 00",
+    30: "off",
+    31: "9 - 18",
+  },
+}
+
 const DAYS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
 const DAY_NAMES = {
   lunes: "Lunes",
@@ -157,6 +259,49 @@ const MONTH_NAMES = [
   "Noviembre",
   "Diciembre",
 ]
+
+const getBossesForDate = (day: number, month: number): Array<{ name: string; schedule: string }> => {
+  const bosses: Array<{ name: string; schedule: string }> = []
+
+  Object.entries(BOSSES_SCHEDULE).forEach(([bossName, schedule]) => {
+    // Accede al horario del día específico. Si no existe o es 'off', no se añade.
+    const daySchedule = schedule[day as keyof typeof schedule]
+
+    if (daySchedule && daySchedule !== "off" && !daySchedule.toLowerCase().includes("off")) {
+      // Normalizar formato de horario para que sea consistente: "HH:MM - HH:MM"
+      let normalizedSchedule = daySchedule.trim()
+
+      // Asegurar que horas y minutos estén presentes (ej: "8 - 17" -> "08:00 - 17:00")
+      const parts = normalizedSchedule.split(/[-–—]/).map((part) => part.trim())
+
+      if (parts.length === 2) {
+        const [startPart, endPart] = parts
+        const startHour = startPart.split(":")[0] || startPart
+        const startMinute = startPart.split(":")[1] || "00"
+        const endHour = endPart.split(":")[0] || endPart
+        const endMinute = endPart.split(":")[1] || "00"
+
+        normalizedSchedule = `${startHour.padStart(2, "0")}:${startMinute.padStart(2, "0")} - ${endHour.padStart(2, "0")}:${endMinute.padStart(2, "0")}`
+      } else {
+        // Si no es un rango típico, intenta formatearlo como pueda, pero prioriza el formato HH:MM
+        const timeMatch = normalizedSchedule.match(/(\d{1,2}):?(\d{0,2})\s*-\s*(\d{1,2}):?(\d{0,2})/)
+        if (timeMatch) {
+          normalizedSchedule = `${timeMatch[1].padStart(2, "0")}:${timeMatch[2].padEnd(2, "0")} - ${timeMatch[3].padStart(2, "0")}:${timeMatch[4].padEnd(2, "0")}`
+        } else {
+          // Si aún no se puede normalizar, usarlo como está pero advertir.
+          console.warn(`Horario de jefe '${bossName}' no pudo ser normalizado completamente: '${daySchedule}'`)
+        }
+      }
+
+      bosses.push({
+        name: bossName,
+        schedule: normalizedSchedule,
+      })
+    }
+  })
+
+  return bosses
+}
 
 // Función para generar fechas de la semana a partir de la fecha de inicio
 const generateWeekDates = (startDate: Date): DailySchedule[] => {
@@ -919,6 +1064,8 @@ export default function KFCScheduleApp() {
     totalPlanned: 0,
     totalActual: 0,
   })
+  // Nuevo estado para resaltar día
+  const [highlightDay, setHighlightDay] = useState<string | null>(null)
 
   // Cargar PDF.js al iniciar
   useEffect(() => {
@@ -1390,40 +1537,42 @@ export default function KFCScheduleApp() {
     }
   }
 
-  const findShiftReplacements = (userSchedule: string, day: string, allEmployees: Employee[]) => {
-    if (!userSchedule || userSchedule.toLowerCase().includes("descanso")) {
-      return { canCoverMe: [] }
-    }
-
-    const userTime = parseTimeRange(userSchedule)
-    if (!userTime) {
-      return { canCoverMe: [] }
-    }
-
+  // Función para encontrar pases (reemplaza findShiftReplacements)
+  const findShiftChanges = (dayName: string, allEmployees: Employee[]) => {
     const canCoverMe: Employee[] = []
 
+    if (!currentUser) return { canCoverMe }
+
+    const userSchedule = currentUser.weeklySchedule[dayName as keyof typeof currentUser.weeklySchedule]
+    const userTime = parseTimeRange(userSchedule)
+
+    if (!userTime || userSchedule.toLowerCase().includes("descanso")) {
+      return { canCoverMe }
+    }
+
     allEmployees.forEach((emp) => {
-      if (emp.cuil === currentUser?.cuil) return
+      if (emp.cuil === currentUser.cuil) return
 
-      const empSchedule = emp.weeklySchedule[day as keyof typeof emp.weeklySchedule]
+      const empSchedule = emp.weeklySchedule[dayName as keyof typeof emp.weeklySchedule]
+      const empTime = parseTimeRange(empSchedule)
 
-      // Solo considerar empleados que trabajan ese día
-      if (empSchedule && !empSchedule.toLowerCase().includes("descanso")) {
-        const empTime = parseTimeRange(empSchedule)
-        if (!empTime) return
+      if (!empTime || empSchedule.toLowerCase().includes("descanso")) {
+        return
+      }
 
-        const userStart = userTime.start // "HH:MM"
-        const userEnd = userTime.end // "HH:MM"
-        const empStart = empTime.start
-        const empEnd = empTime.end
+      // Lógica de coincidencia exacta de entrada/salida para pases
+      const userStart = userTime.start
+      const userEnd = userTime.end
+      const empStart = empTime.start
+      const empEnd = empTime.end
 
-        // Limita si su salida es exactamente mi entrada, o su entrada es exactamente mi salida
-        const coversAtStart = empEnd === userStart // Su salida = Mi entrada
-        const coversAtEnd = empStart === userEnd // Su entrada = Mi salida
+      // El empleado empieza exactamente cuando el usuario termina (pase de salida)
+      const exactEndMatch = empStart === userEnd
+      // El empleado termina exactamente cuando el usuario empieza (pase de entrada)
+      const exactStartMatch = empEnd === userStart
 
-        if (coversAtStart || coversAtEnd) {
-          canCoverMe.push(emp)
-        }
+      if (exactStartMatch || exactEndMatch) {
+        canCoverMe.push(emp)
       }
     })
 
@@ -1566,13 +1715,17 @@ export default function KFCScheduleApp() {
                       <div
                         key={daySchedule.date}
                         // Añadir onClick para hacer scroll a la coincidencia si no es descanso
-                        onClick={() => !isRest && scrollToCoincidence(daySchedule.dayName)}
+                        onClick={() => {
+                          !isRest && scrollToCoincidence(daySchedule.dayName)
+                          !isRest && setHighlightDay(daySchedule.dayName) // Resaltar día al hacer clic
+                          setTimeout(() => setHighlightDay(null), 3000) // Remover resaltado después de 3 seg
+                        }}
                         className={`flex justify-between items-center p-3 sm:p-4 rounded-xl transition-all ${
                           isRest
                             ? "bg-gray-100 border-2 border-gray-200"
                             : // Añadir estilos para hacer el div clicable y visible
                               "bg-blue-50 border-2 border-blue-200 cursor-pointer hover:bg-blue-100 hover:border-blue-300 hover:shadow-md"
-                        }`}
+                        } ${highlightDay === daySchedule.dayName ? "ring-2 ring-blue-400 shadow-lg" : ""}`}
                       >
                         <div className="flex flex-col">
                           <span className="font-bold text-base sm:text-lg text-gray-700">
@@ -1738,124 +1891,148 @@ export default function KFCScheduleApp() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-lg border-blue-200">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:p-6">
-                <CardTitle className="text-xl sm:text-2xl text-blue-700 flex items-center gap-2">
-                  <Users className="h-5 w-5 sm:h-6 sm:w-6" />👥 Coincidencias y Pases
+            <Card className="shadow-lg border-green-200">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 p-4 sm:p-6">
+                <CardTitle className="text-xl sm:text-2xl text-green-700 flex items-center gap-2">
+                  <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+                  Coincidencias y Pases
                 </CardTitle>
                 <CardDescription className="text-base sm:text-lg">
-                  Con quien trabajas y a quien le haces el pase
+                  Compañeros que trabajan contigo y posibles pases
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:pt-6">
-                <div className="space-y-3 sm:space-y-4">
-                  {DAYS.map((day) => {
-                    const dayCoincidences = coincidences[day] || []
-                    const userSchedule = currentUser.weeklySchedule[day as keyof typeof currentUser.weeklySchedule]
-                    const { canCoverMe } = findShiftReplacements(userSchedule, day, currentWeekData.employees)
-                    const currentTab = dayTabs[day] || "coincidences"
+                <div className="space-y-4 sm:space-y-6">
+                  {currentUser.dailySchedules
+                    .filter((daySchedule) => !daySchedule.schedule.toLowerCase().includes("descanso"))
+                    .map((daySchedule) => {
+                      const dayCoincidences = coincidences[daySchedule.dayName] || []
+                      const shifts = findShiftChanges(daySchedule.dayName, currentWeekData.employees)
 
-                    if (userSchedule.toLowerCase().includes("descanso")) {
+                      const bossesForDay = getBossesForDate(daySchedule.day, daySchedule.month + 1)
+                      const activeTab = dayTabs[daySchedule.dayName] || "coincidences"
+
                       return (
                         <div
-                          key={day}
-                          // Añadir ID para hacer scroll
-                          id={`coincidence-${day}`}
-                          className="p-3 sm:p-4 rounded-xl bg-gray-100 border-2 border-gray-200 transition-all"
+                          key={daySchedule.date}
+                          id={`coincidence-${daySchedule.dayName}`}
+                          className={`scroll-mt-4 p-4 sm:p-6 rounded-xl border-2 transition-all ${
+                            highlightDay === daySchedule.dayName
+                              ? "border-blue-500 ring-4 ring-blue-300"
+                              : "border-green-200 bg-green-50"
+                          }`}
                         >
-                          <div className="font-bold text-base sm:text-lg text-gray-600 flex items-center gap-2">
-                            😴 {DAY_NAMES[day as keyof typeof DAY_NAMES]} - Descanso
-                          </div>
-                        </div>
-                      )
-                    }
+                          <div className="mb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <h3 className="text-lg sm:text-xl font-bold text-green-700">
+                                📅 {DAY_NAMES[daySchedule.dayName as keyof typeof DAY_NAMES]}
+                              </h3>
+                              <Badge
+                                variant="outline"
+                                className="text-sm sm:text-base bg-green-100 text-green-700 border-green-300 w-fit"
+                              >
+                                ⏰ {daySchedule.schedule}
+                              </Badge>
+                            </div>
 
-                    return (
-                      <div
-                        key={day}
-                        // Añadir ID para hacer scroll
-                        id={`coincidence-${day}`}
-                        className="p-3 sm:p-4 rounded-xl border-2 bg-white border-blue-200 transition-all"
-                      >
-                        <div className="font-bold text-base sm:text-lg mb-2 flex flex-col sm:flex-row sm:items-center gap-2">
-                          <span className="flex items-center gap-2">📅 {DAY_NAMES[day as keyof typeof DAY_NAMES]}</span>
-                          <Badge variant="outline" className="text-xs sm:text-sm w-fit">
-                            ⏰ {userSchedule}
-                          </Badge>
-                        </div>
-
-                        <Tabs
-                          value={currentTab}
-                          onValueChange={(v) =>
-                            setDayTabs((prev) => ({ ...prev, [day]: v as "coincidences" | "shifts" }))
-                          }
-                          className="mt-3"
-                        >
-                          <TabsList className="grid w-full grid-cols-2 mb-3">
-                            <TabsTrigger value="coincidences" className="text-xs sm:text-sm">
-                              👥 Coincidencias ({dayCoincidences.length})
-                            </TabsTrigger>
-                            <TabsTrigger value="shifts" className="text-xs sm:text-sm">
-                              🔄 Pases ({canCoverMe.length})
-                            </TabsTrigger>
-                          </TabsList>
-
-                          <TabsContent value="coincidences" className="mt-0">
-                            {dayCoincidences.length > 0 ? (
-                              <div className="space-y-2">
-                                <div className="text-sm font-medium text-green-700 mb-2">
-                                  ✅ {dayCoincidences.length} coincidencia{dayCoincidences.length > 1 ? "s" : ""}:
+                            {bossesForDay.length > 0 ? (
+                              <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                  👔 Lideres en turno
                                 </div>
-                                {dayCoincidences.map((emp) => (
-                                  <div
-                                    key={emp.cuil}
-                                    className="bg-green-50 p-2 sm:p-3 rounded-lg border border-green-200 shadow-sm"
-                                  >
-                                    <div className="font-semibold text-sm sm:text-base text-gray-800 truncate">
-                                      👤 {emp.name}
+                                <div className="space-y-1">
+                                  {bossesForDay.map((boss, idx) => (
+                                    <div key={idx} className="text-sm text-gray-700">
+                                      • {boss.name} – {boss.schedule}
                                     </div>
-                                    <div className="text-green-600 font-medium text-sm">
-                                      ⏰ {emp.weeklySchedule[day as keyof typeof emp.weeklySchedule]}
-                                    </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
                               </div>
                             ) : (
-                              <div className="text-orange-600 font-medium text-sm sm:text-base py-2">
-                                ⚠️ Trabajas solo este día
+                              <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="text-xs text-gray-500">Sin jefe asignado</div>
                               </div>
                             )}
-                          </TabsContent>
+                          </div>
 
-                          <TabsContent value="shifts" className="mt-0">
-                            <div className="space-y-3">
-                              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                                <div className="text-sm font-semibold text-blue-700 mb-2">
-                                  🔄 Entra/sale por mi ({canCoverMe.length}):
-                                </div>
-                                {canCoverMe.length > 0 ? (
-                                  <div className="space-y-2">
-                                    {canCoverMe.map((emp) => (
-                                      <div key={emp.cuil} className="bg-white p-2 rounded border border-blue-100">
-                                        <div className="font-medium text-sm text-gray-800 truncate">👤 {emp.name}</div>
-                                        <div className="text-blue-600 text-xs">
-                                          ⏰ Trabaja: {emp.weeklySchedule[day as keyof typeof emp.weeklySchedule]}
+                          <Tabs
+                            value={activeTab}
+                            onValueChange={(value) =>
+                              setDayTabs((prev) => ({
+                                ...prev,
+                                [daySchedule.dayName]: value as "coincidences" | "shifts",
+                              }))
+                            }
+                          >
+                            <TabsList className="grid w-full grid-cols-2 mb-4">
+                              <TabsTrigger value="coincidences" className="text-xs sm:text-sm">
+                                👥 Coincidencias ({dayCoincidences.length})
+                              </TabsTrigger>
+                              <TabsTrigger value="shifts" className="text-xs sm:text-sm">
+                                🔄 Pases ({shifts.canCoverMe.length})
+                              </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="coincidences">
+                              {dayCoincidences.length > 0 ? (
+                                <div className="space-y-3">
+                                  {dayCoincidences.map((emp) => (
+                                    <div
+                                      key={emp.cuil}
+                                      className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border border-green-200 hover:shadow-md transition-shadow"
+                                    >
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                        <div className="font-semibold text-base sm:text-lg text-gray-800">
+                                          👤 {emp.name}
                                         </div>
+                                        <Badge className="bg-blue-600 text-white text-sm sm:text-base w-fit">
+                                          ⏰{" "}
+                                          {emp.weeklySchedule[daySchedule.dayName as keyof typeof emp.weeklySchedule]}
+                                        </Badge>
                                       </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="text-gray-500 text-sm">
-                                    ⚠️ No hay empleados que limitan con tu horario
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </TabsContent>
-                        </Tabs>
-                      </div>
-                    )
-                  })}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center p-6 sm:p-8 text-gray-500 bg-gray-50 rounded-lg">
+                                  <p className="text-base sm:text-lg">😴 No hay coincidencias este día</p>
+                                </div>
+                              )}
+                            </TabsContent>
+
+                            <TabsContent value="shifts">
+                              {shifts.canCoverMe.length > 0 ? (
+                                <div className="space-y-3">
+                                  <p className="text-sm text-gray-600 mb-3">
+                                    🔄 Teams con los que te cruzas
+                                  </p>
+                                  {shifts.canCoverMe.map((emp) => (
+                                    <div
+                                      key={emp.cuil}
+                                      className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border border-blue-200 hover:shadow-md transition-shadow"
+                                    >
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                        <div className="font-semibold text-base sm:text-lg text-gray-800">
+                                          👤 {emp.name}
+                                        </div>
+                                        <Badge className="bg-blue-600 text-white text-sm sm:text-base w-fit">
+                                          ⏰{" "}
+                                          {emp.weeklySchedule[daySchedule.dayName as keyof typeof emp.weeklySchedule]}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center p-6 sm:p-8 text-gray-500 bg-gray-50 rounded-lg">
+                                  <p className="text-base sm:text-lg">🔒 No hay pases disponibles este día</p>
+                                </div>
+                              )}
+                            </TabsContent>
+                          </Tabs>
+                        </div>
+                      )
+                    })}
                 </div>
               </CardContent>
             </Card>
