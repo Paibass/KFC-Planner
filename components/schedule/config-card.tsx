@@ -1,0 +1,104 @@
+"use client"
+
+import type React from "react"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { RefreshCw, Trash2, Clock } from "lucide-react"
+
+interface ConfigCardProps {
+  cuilInput: string
+  onCuilChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onClearData: () => void
+  loading: boolean
+  pdfLoaded: boolean
+  error: string
+}
+
+export function ConfigCard({
+  cuilInput,
+  onCuilChange,
+  onFileUpload,
+  onClearData,
+  loading,
+  pdfLoaded,
+  error,
+}: ConfigCardProps) {
+  return (
+    <Card className="shadow-lg border-orange-200">
+      <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 p-4 sm:p-6">
+        <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl text-red-700">
+          <RefreshCw className="h-5 w-5 sm:h-6 sm:w-6" />
+          Configuración
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 sm:space-y-6 p-4 sm:pt-6">
+        <div className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
+          <div className="space-y-2 sm:space-y-3">
+            <Label htmlFor="cuil" className="text-base sm:text-lg font-semibold text-gray-700">
+              🆔 Tu CUIL
+            </Label>
+            <Input
+              id="cuil"
+              type="text"
+              placeholder="20123456789"
+              value={cuilInput}
+              onChange={onCuilChange}
+              className="text-base sm:text-lg h-12 border-2 border-orange-200 focus:border-red-400"
+              maxLength={13}
+            />
+          </div>
+
+          <div className="space-y-2 sm:space-y-3">
+            <Label htmlFor="pdf" className="text-base sm:text-lg font-semibold text-gray-700">
+              📄 Cargar PDF Semanal
+            </Label>
+            <Input
+              id="pdf"
+              type="file"
+              accept=".pdf"
+              onChange={onFileUpload}
+              disabled={loading || !pdfLoaded}
+              className="text-sm sm:text-lg h-12 border-2 border-orange-200 focus:border-red-400"
+            />
+            {!pdfLoaded && (
+              <div className="flex items-center gap-2 text-orange-600">
+                <Clock className="h-4 w-4 animate-spin" />
+                <span className="text-sm">⏳ Cargando sistema...</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <Button
+            onClick={onClearData}
+            variant="outline"
+            className="w-full border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpiar Todos los Datos
+          </Button>
+        </div>
+
+        {loading && (
+          <Alert className="border-blue-200 bg-blue-50">
+            <Clock className="h-5 w-5 animate-spin text-blue-600" />
+            <AlertDescription className="text-base sm:text-lg font-medium text-blue-800">
+              🔄 Procesando PDF...
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {error && (
+          <Alert variant="destructive" className="border-red-300">
+            <AlertDescription className="text-base sm:text-lg font-medium">❌ {error}</AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
