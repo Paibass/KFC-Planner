@@ -6,7 +6,7 @@ export const getBossesForDate = (day: number, month: number): Array<{ name: stri
   Object.entries(BOSSES_SCHEDULE).forEach(([bossName, schedule]) => {
     const daySchedule = schedule[day as keyof typeof schedule]
 
-    if (daySchedule && daySchedule !== "off" && !daySchedule.toLowerCase().includes("off")) {
+    if (daySchedule && daySchedule !== "off" && !daySchedule.toLowerCase().includes("off")  &&  !daySchedule.toLowerCase().includes("vac")) {
       let normalizedSchedule = daySchedule.trim()
 
       const parts = normalizedSchedule.split(/[-–—]/).map((part) => part.trim())
