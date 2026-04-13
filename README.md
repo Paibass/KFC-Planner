@@ -1,30 +1,96 @@
-# Kfc shift planner
+# 🚀 KFC HORARIOS 🍗
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/paibass-projects/v0-kfc-shift-planner)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/p6rfn4AwVbV)
+**KFC HORARIOS** es una aplicación web que lee automáticamente los horarios laborales desde un PDF y te muestra toda la información relevante de forma clara, rápida y sin esfuerzo.
 
-## Overview
+---
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## 🧩 Funcionalidades principales
 
-## Deployment
+### 📄 Lectura automática de horarios
+- Lee archivos PDF de horarios desde la app
+- Procesa la información directamente en el navegador
+- No necesitás copiar ni cargar datos manualmente
 
-Your project is live at:
+---
 
-**[https://vercel.com/paibass-projects/v0-kfc-shift-planner](https://vercel.com/paibass-projects/v0-kfc-shift-planner)**
+### 🆔 Identificación por CUIL
+- Ingresás tu CUIL una sola vez
+- La app te identifica automáticamente dentro del PDF
+- Siempre ves **solo tus horarios**
 
-## Build your app
+---
 
-Continue building your app on:
+### 📅 Visualización de tus turnos
+- Muestra tus horarios organizados por día
+- Interfaz clara y fácil de leer
+- Adaptado para uso desde el celular
 
-**[https://v0.dev/chat/projects/p6rfn4AwVbV](https://v0.dev/chat/projects/p6rfn4AwVbV)**
+---
 
-## How It Works
+### 🌙 Diferenciación de horas nocturnas
+- Detecta automáticamente horarios nocturnos
+- Te permite distinguir entre:
+  - Horas normales
+  - Horas nocturnas
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+---
+
+### 👥 Coincidencias con compañeros
+- Te muestra con quién trabajás en cada turno
+- Detecta coincidencias parciales o completas
+- Ideal para organización y coordinación
+
+---
+
+### 🔁 Pase de turno
+- Identifica a quién le entregás el turno
+- Visualización clara del cambio entre empleados
+- Facilita entender la continuidad del trabajo
+
+---
+
+## 🧠 ¿Por qué es útil?
+
+Porque en el día a día:
+- Los horarios cambian constantemente
+- No sabés con quién coincidís hasta que llegás
+- No es fácil ver tus horas reales de un vistazo
+
+---
+
+## 📱 Experiencia de uso
+
+- Diseño simple e intuitivo
+- Optimizado para celular
+- Sin configuraciones complicadas
+- Todo listo en segundos
+
+---
+
+## 💾 Guardado automático
+
+- El CUIL se guarda en el navegador (`localStorage`)
+- No necesitás volver a ingresarlo cada vez
+
+---
+
+## 🛠️ Tecnologías
+
+- React + Vite
+- TypeScript
+- pdfjs-dist (lectura de PDF)
+- LocalStorage
+
+---
+
+## 👨‍💻 Autor
+
+**Joaquín Paiva**
+
+---
+
+## ⚠️ Nota
+
+Esta app es una herramienta de visualización de horarios.  
+Los datos dependen del PDF cargado.
