@@ -9,14 +9,13 @@ import type { Employee } from "@/types/schedule"
 
 export default function AllSchedulesPage() {
   const [employees, setEmployees] = useState<Employee[] | null>(null)
-  const [period, setPeriod] = useState<string>("")
+
 
   useEffect(() => {
     const data = loadScheduleData()
     if (data && data.currentWeek && data.weeks[data.currentWeek]) {
       const week = data.weeks[data.currentWeek]
       setEmployees(week.employees)
-      setPeriod(week.period)
     } else {
       setEmployees([])
     }
@@ -26,12 +25,6 @@ export default function AllSchedulesPage() {
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 p-2 sm:p-4 font-light font-mono">
       <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
         <HeaderCard navHref="/" navLabel="Volver a mi horario" navVariant="back" />
-
-        {period && (
-          <div className="text-center text-sm text-gray-500">
-            Semana: <span className="font-semibold text-gray-700">{period}</span>
-          </div>
-        )}
 
         {employees === null ? null : employees.length > 0 ? (
           <AllSchedulesTable employees={employees} />
