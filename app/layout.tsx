@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   title: "KFC Liniers",
   description: "Aplicación para ver tus horarios",
   generator: "v0.dev",
+  icons: {
+    icon: "/icon.svg",
+  },
 }
 
 export default function RootLayout({
