@@ -81,19 +81,6 @@ export interface StoredData {
   loadedAt: string
 }
 
-export interface WeeklyHourTracker {
-  planned: number
-  actual: {
-    [day: string]: {
-      checkIn: string
-      checkOut: string
-      totalHours: number
-    }
-  }
-  totalPlanned: number
-  totalActual: number
-}
-
 export interface BossSchedule {
   [day: number]: string
 }
