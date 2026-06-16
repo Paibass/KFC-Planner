@@ -64,7 +64,7 @@ export function AllSchedulesTable({ employees }: AllSchedulesTableProps) {
               {sortedEmployees.map((emp, idx) => {
                 const { totalHours, offCount } = getEmployeeTotals(emp)
                 return (
-                  <tr key={emp.cuil} className={idx % 2 === 0 ? "bg-white" : "bg-orange-50/40"}>
+                  <tr key={emp.cuil} className={idx % 2 === 0 ? "bg-white" : "bg-orange-50"}>
                     <td className="sticky left-0 z-10 px-3 py-3 font-semibold text-gray-800 whitespace-nowrap border-b border-gray-100 bg-inherit">
                       <div>{emp.name}</div>
                       <div className="text-xs font-normal text-gray-500">

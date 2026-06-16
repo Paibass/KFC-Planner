@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import type { Employee } from "@/types/schedule"
-import { Clock, Moon, Coffee } from "lucide-react"
+import { Clock, Moon, AlarmClockOff } from "lucide-react"
 
 interface WeeklySummaryCardProps {
   currentUser: Employee
@@ -38,7 +38,7 @@ export function WeeklySummaryCard({ currentUser }: WeeklySummaryCardProps) {
     {
       label: "Descansos",
       value: `${restCount} ${restCount === 1 ? "día" : "días"}`,
-      icon: Coffee,
+      icon: AlarmClockOff ,
       iconClass: "text-gray-600",
       bgClass: "bg-gray-50 border-gray-200",
     },
