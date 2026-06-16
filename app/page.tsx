@@ -7,6 +7,7 @@ import { usePdf } from "@/hooks/use-pdf"
 import { useSchedule } from "@/hooks/use-schedule"
 import { HeaderCard } from "@/components/schedule/header-card"
 import { ConfigCard } from "@/components/schedule/config-card"
+import { WeeklySummaryCard } from "@/components/schedule/weekly-summary-card"
 import { UserScheduleCard } from "@/components/schedule/user-schedule-card"
 import { CoincidencesCard } from "@/components/schedule/coincidences-card"
 
@@ -65,6 +66,8 @@ export default function KFCScheduleApp() {
 
         {currentWeekData && currentUser && (
           <>
+            <WeeklySummaryCard currentUser={currentUser} />
+
             <UserScheduleCard currentUser={currentUser} highlightDay={highlightDay} onDayClick={handleDayClick} />
 
             <CoincidencesCard
