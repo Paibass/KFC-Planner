@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, CalendarDays, ArrowLeft } from "lucide-react"
+import { CalendarDays, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
 interface HeaderCardProps {
@@ -14,7 +14,7 @@ export function HeaderCard({ navHref, navLabel, navVariant = "forward" }: Header
     <Card className="border-red-200 shadow-lg bg-gradient-to-r from-red-600 to-orange-600 text-white">
       <CardHeader className="text-center p-4 sm:p-6">
         <CardTitle className="text-2xl sm:text-3xl md:text-4xl font-bold flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
-          <Calendar className="h-8 w-8 sm:h-10 sm:w-10" />
+         
           <span className="text-center">🍗KFC Plaza Liniers🍗</span>
         </CardTitle>
         {navHref && (
