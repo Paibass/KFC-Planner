@@ -25,7 +25,7 @@ export const calculateDayHours = (schedule: string): { hours: number; nightHours
   const totalMinutes = endMinutes - startMinutes
   const hours = totalMinutes / 60
 
-  const nightStart = 22 * 60
+  const nightStart = 21 * 60
   const nightEnd = 6 * 60
   let nightMinutes = 0
 
