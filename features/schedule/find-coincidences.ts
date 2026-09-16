@@ -14,7 +14,7 @@ export const findCoincidences = (user: Employee, allEmployees: Employee[]): { [k
     }
 
     const matches = allEmployees.filter((emp) => {
-      if (emp.cuil === user.cuil) return false
+      if (emp === user) return false
 
       const empTime = parseTimeRange(emp.weeklySchedule[day as keyof typeof emp.weeklySchedule])
       if (!empTime) return false

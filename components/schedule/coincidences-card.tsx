@@ -115,7 +115,7 @@ export function CoincidencesCard({
                         <div className="space-y-3">
                           {dayCoincidences.map((emp) => (
                             <div
-                              key={emp.cuil}
+                              key={`${emp.cuil || emp.name}-${daySchedule.dayName}`}
                               className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border border-green-200 hover:shadow-md transition-shadow"
                             >
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -140,7 +140,7 @@ export function CoincidencesCard({
                           <p className="text-sm text-gray-600 mb-3">🔄 Teams con los que te cruzas</p>
                           {shifts.canCoverMe.map((emp) => (
                             <div
-                              key={emp.cuil}
+                              key={`${emp.cuil || emp.name}-${daySchedule.dayName}`}
                               className="p-3 sm:p-4 bg-white rounded-lg shadow-sm border border-blue-200 hover:shadow-md transition-shadow"
                             >
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
