@@ -52,11 +52,15 @@ export function ConfigCard({
                 <SelectValue placeholder={hasEmployees ? "Selecciona tu nombre" : "Carga un PDF primero"} />
               </SelectTrigger>
               <SelectContent>
-                {employees.map((emp) => (
-                  <SelectItem key={emp.cuil} value={emp.cuil}>
-                    {emp.name}
-                  </SelectItem>
-                ))}
+                {employees.map((emp, index) => {
+                  const employeeValue = emp.cuil || emp.name.trim() || `employee-${index}`
+
+                  return (
+                    <SelectItem key={employeeValue} value={employeeValue}>
+                      {emp.name}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>

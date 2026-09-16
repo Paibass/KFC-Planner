@@ -59,7 +59,7 @@ export const useSchedule = (pdfLoaded: boolean) => {
       return
     }
 
-    const user = currentWeekData.employees.find((emp) => emp.cuil === selectedCuil)
+    const user = currentWeekData.employees.find((emp) => (emp.cuil || emp.name.trim()) === selectedCuil)
 
     if (user) {
       setCurrentUser(user)
@@ -117,7 +117,7 @@ export const useSchedule = (pdfLoaded: boolean) => {
         | undefined
 
       if (selectedCuil) {
-        const user = parsedEmployees.find((emp) => emp.cuil === selectedCuil)
+        const user = parsedEmployees.find((emp) => (emp.cuil || emp.name.trim()) === selectedCuil)
         if (user) {
           userStats = calculateUserStatsWithDates(user)
         }
