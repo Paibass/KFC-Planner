@@ -3,12 +3,61 @@ import { cleanPDFText } from "@/features/pdf/clean-pdf-text"
 import { generateWeekDates } from "@/features/schedule/generate-week-dates"
 import { calculateDayHours } from "./calculate-day-hours"
 
+const schedulePattern = /(\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2}|Descanso)/gi
+
+const createEmployee = (name: string, schedules: string[], weekDates: ReturnType<typeof generateWeekDates>): Employee => {
+  const weeklySchedule = {
+    lunes: schedules[0],
+    martes: schedules[1],
+    miercoles: schedules[2],
+    jueves: schedules[3],
+    viernes: schedules[4],
+    sabado: schedules[5],
+    domingo: schedules[6],
+  }
+
+  const dailySchedules = weekDates.map((dateInfo, index) => {
+    const schedule = schedules[index]
+    const { hours, nightHours } = calculateDayHours(schedule)
+    return { ...dateInfo, schedule, hours, nightHours }
+  })
+
+  return { name, cuil: "", weeklySchedule, dailySchedules }
+}
+
+const parseNameOnlyFormat = (cleanedText: string, weekDates: ReturnType<typeof generateWeekDates>): Employee[] => {
+  const matches = [...cleanedText.matchAll(schedulePattern)]
+  const employees: Employee[] = []
+  const usedNames = new Set<string>()
+  let previousEnd = 0
+
+  for (let index = 0; index + 6 < matches.length; index += 7) {
+    const group = matches.slice(index, index + 7)
+    const schedules = group.map((match) => match[1].trim().replace(/[-–—]/g, "-"))
+    const nameText = cleanedText.slice(previousEnd, group[0].index).replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñÜü' ]/g, " ").trim()
+    const words = nameText.split(/\s+/).filter(Boolean)
+    const name = words.at(-1) ?? ""
+
+    if (!name || name.length < 2 || usedNames.has(name) || schedules.length !== 7) break
+
+    employees.push(createEmployee(name, schedules, weekDates))
+    usedNames.add(name)
+    previousEnd = (group[6].index ?? 0) + group[6][0].length
+  }
+
+  return employees
+}
+
 export const parseEmployeesFromText = (text: string, weekStartDate: Date): Employee[] => {
   const employees: Employee[] = []
   const usedNames = new Set<string>()
   const weekDates = generateWeekDates(weekStartDate)
 
   const cleanedText = cleanPDFText(text)
+
+  if (!/\d{2}[\s-]*\d{7,9}[\s-]*\d/.test(cleanedText)) {
+    return parseNameOnlyFormat(cleanedText, weekDates)
+  }
 
   console.log("=== PARSING OPTIMIZADO PARA EMPLEADOS ===")
   console.log(
