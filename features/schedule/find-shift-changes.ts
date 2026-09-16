@@ -18,7 +18,7 @@ export const findShiftChanges = (
   }
 
   allEmployees.forEach((emp) => {
-    if (emp.cuil === currentUser.cuil) return
+    if (emp === currentUser) return
 
     const empSchedule = emp.weeklySchedule[dayName as keyof typeof emp.weeklySchedule]
     const empTime = parseTimeRange(empSchedule)
